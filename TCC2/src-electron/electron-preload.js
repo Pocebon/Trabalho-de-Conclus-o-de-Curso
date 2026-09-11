@@ -27,6 +27,36 @@ contextBridge.exposeInMainWorld(
           listener
         )
       }
+    },
+
+    loginUser: async (
+      credentials
+    ) => {
+      return await ipcRenderer.invoke(
+        'login-user',
+        credentials
+      )
+    },
+
+    logoutUser: async () => {
+      return await ipcRenderer.invoke(
+        'logout-user'
+      )
+    },
+
+    getStopReasons: async () => {
+      return await ipcRenderer.invoke(
+        'get-stop-reasons'
+      )
+    },
+
+    registerStopReason: async (
+      data
+    ) => {
+      return await ipcRenderer.invoke(
+        'register-stop-reason',
+        data
+      )
     }
   }
 )
