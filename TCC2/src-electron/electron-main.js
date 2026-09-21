@@ -1,3 +1,4 @@
+
 import {
   app,
   BrowserWindow,
@@ -10,8 +11,6 @@ import os from 'node:os'
 import {
   fileURLToPath
 } from 'node:url'
-
-import db from './database.js'
 
 import {
   startLogMonitor
@@ -26,43 +25,26 @@ const currentDir =
     new URL('.', import.meta.url)
   )
 
+const API_URL =
+  'http://localhost:3000/api'
+
 let mainWindow
 let logMonitor
 let currentOperator = null
+let activeStopId = null
 
 function padNumber (value) {
-  return String(value)
-    .padStart(2, '0')
+  return String(value).padStart(2, '0')
 }
 
 function formatLocalDateTime (date) {
-  const year =
-    date.getFullYear()
+  const year = date.getFullYear()
+  const month = padNumber(date.getMonth() + 1)
+  const day = padNumber(date.getDate())
 
-  const month =
-    padNumber(
-      date.getMonth() + 1
-    )
-
-  const day =
-    padNumber(
-      date.getDate()
-    )
-
-  const hour =
-    padNumber(
-      date.getHours()
-    )
-
-  const minute =
-    padNumber(
-      date.getMinutes()
-    )
-
-  const second =
-    padNumber(
-      date.getSeconds()
-    )
+  const hour = padNumber(date.getHours())
+  const minute = padNumber(date.getMinutes())
+  const second = padNumber(date.getSeconds())
 
   return (
     `${year}-${month}-${day} ` +
@@ -71,33 +53,30 @@ function formatLocalDateTime (date) {
 }
 
 async function createWindow () {
-  mainWindow =
-    new BrowserWindow({
-      icon: path.resolve(
+  mainWindow = new BrowserWindow({
+    icon: path.resolve(
+      currentDir,
+      'icons/icon.png'
+    ),
+
+    width: 1000,
+    height: 600,
+    useContentSize: true,
+
+    webPreferences: {
+      contextIsolation: true,
+
+      preload: path.resolve(
         currentDir,
-        'icons/icon.png'
-      ),
+        path.join(
+          process.env.QUASAR_ELECTRON_PRELOAD_FOLDER,
 
-      width: 1000,
-      height: 600,
-      useContentSize: true,
-
-      webPreferences: {
-        contextIsolation: true,
-
-        preload: path.resolve(
-          currentDir,
-          path.join(
-            process.env
-              .QUASAR_ELECTRON_PRELOAD_FOLDER,
-
-            'electron-preload' +
-              process.env
-                .QUASAR_ELECTRON_PRELOAD_EXTENSION
-          )
+          'electron-preload' +
+            process.env.QUASAR_ELECTRON_PRELOAD_EXTENSION
         )
-      }
-    })
+      )
+    }
+  })
 
   if (process.env.DEV) {
     await mainWindow.loadURL(
@@ -110,109 +89,114 @@ async function createWindow () {
   }
 
   if (process.env.DEBUGGING) {
-    mainWindow
-      .webContents
-      .openDevTools()
+    mainWindow.webContents.openDevTools()
   } else {
-    mainWindow
-      .webContents
-      .on(
-        'devtools-opened',
-        () => {
-          mainWindow
-            .webContents
-            .closeDevTools()
-        }
-      )
+    mainWindow.webContents.on(
+      'devtools-opened',
+      () => {
+        mainWindow.webContents.closeDevTools()
+      }
+    )
   }
 
-  mainWindow.on(
-    'closed',
-    () => {
-      mainWindow = null
-    }
-  )
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
 }
 
-async function testDatabaseConnection () {
+async function testApiConnection () {
   try {
-    const result =
-      await db.one(
-        'SELECT NOW()'
-      )
-
-    console.log(
-      'Banco conectado com sucesso:'
+    const response = await fetch(
+      `${API_URL}/health`
     )
 
-    console.log(result)
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      console.error(
+        'API respondeu com erro:',
+        result.message
+      )
+
+      return
+    }
+
+    console.log('')
+    console.log(
+      'API conectada com sucesso.'
+    )
+
+    console.log(result.message)
   } catch (error) {
     console.error(
-      'Erro ao conectar no banco:',
+      'Não foi possível conectar à API:',
       error
     )
   }
 }
 
 function registerIpcHandlers () {
+
   ipcMain.handle(
     'login-user',
 
-    async (
-      event,
-      credentials
-    ) => {
+    async (event, credentials) => {
       try {
-        const user =
-          await db.oneOrNone(
-            `
-            SELECT
-              id,
-              nome,
-              email,
-              perfil
-            FROM usuarios
-            WHERE LOWER(email) = LOWER($1)
-              AND senha = $2
-              AND ativo = TRUE
-            LIMIT 1
-            `,
-            [
-              credentials.email,
-              credentials.senha
-            ]
-          )
+        console.log('')
+        console.log(
+          'Enviando login para a API...'
+        )
 
-        if (!user) {
+        const response = await fetch(
+          `${API_URL}/auth/login`,
+          {
+            method: 'POST',
+
+            headers: {
+              'Content-Type': 'application/json'
+            },
+
+            body: JSON.stringify({
+              email: credentials.email,
+              senha: credentials.senha
+            })
+          }
+        )
+
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
           return {
             success: false,
             message:
+              result.message ||
               'E-mail ou senha inválidos.'
           }
         }
 
-        currentOperator = user
+        currentOperator = result.user
 
         console.log('')
         console.log(
-          'Usuário autenticado:'
+          'Usuário autenticado pela API:'
         )
-        console.log(user)
+
+        console.log(currentOperator)
 
         return {
           success: true,
-          user
+          user: currentOperator
         }
       } catch (error) {
         console.error(
-          'Erro ao realizar login:',
+          'Erro ao comunicar com a API:',
           error
         )
 
         return {
           success: false,
           message:
-            'Não foi possível realizar o login.'
+            'Não foi possível conectar à API.'
         }
       }
     }
@@ -239,32 +223,45 @@ function registerIpcHandlers () {
 
     async () => {
       try {
-        const reasons =
-          await db.any(
-            `
-            SELECT
-              id,
-              descricao
-            FROM motivos_parada
-            WHERE ativo = TRUE
-            ORDER BY descricao
-            `
-          )
+        console.log('')
+        console.log(
+          'Buscando motivos pela API...'
+        )
+
+        const response = await fetch(
+          `${API_URL}/motivos`
+        )
+
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+          return {
+            success: false,
+            message:
+              result.message ||
+              'Erro ao buscar motivos de parada.'
+          }
+        }
+
+        console.log(
+          'Motivos recebidos da API:',
+          result.data.length
+        )
 
         return {
           success: true,
-          data: reasons
+          data: result.data
         }
       } catch (error) {
         console.error(
-          'Erro ao buscar motivos:',
+          'Erro ao comunicar com a API:',
           error
         )
 
         return {
           success: false,
           message:
-            'Erro ao buscar motivos de parada.'
+            'Não foi possível buscar os motivos de parada.'
         }
       }
     }
@@ -273,23 +270,17 @@ function registerIpcHandlers () {
   ipcMain.handle(
     'register-stop-reason',
 
-    async (
-      event,
-      data
-    ) => {
+    async (event, data) => {
       try {
         console.log('')
         console.log(
-          'Registrando ocorrência...'
+          'Enviando justificativa para a API...'
         )
 
-        console.log(data)
-
-        if (!data.paradaId) {
+        if (!data?.paradaId) {
           return {
             success: false,
-            message:
-              'Parada não informada.'
+            message: 'Parada não informada.'
           }
         }
 
@@ -301,73 +292,85 @@ function registerIpcHandlers () {
           }
         }
 
-        const occurrence =
-          await db.one(
-            `
-            INSERT INTO ocorrencias (
-              parada_id,
-              usuario_id,
-              motivo_id,
-              observacao
-            )
-            VALUES (
-              $1,
-              $2,
-              $3,
-              $4
-            )
-            RETURNING *
-            `,
-            [
-              data.paradaId,
-              currentOperator.id,
-              data.reasonId,
-              data.observation || null
-            ]
+        if (
+          currentOperator.perfil !== 'operador'
+        ) {
+          return {
+            success: false,
+            message:
+              'Apenas operadores podem justificar paradas.'
+          }
+        }
+
+        if (!data.reasonId) {
+          return {
+            success: false,
+            message:
+              'Selecione um motivo para a parada.'
+          }
+        }
+
+        const response = await fetch(
+          `${API_URL}/paradas/${data.paradaId}/ocorrencias`,
+          {
+            method: 'POST',
+
+            headers: {
+              'Content-Type': 'application/json'
+            },
+
+            body: JSON.stringify({
+              usuarioId: currentOperator.id,
+              motivoId: data.reasonId,
+              observacao: data.observation || null
+            })
+          }
+        )
+
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+          console.error(
+            'API recusou a justificativa:',
+            result.message
           )
 
-        await db.none(
-          `
-          UPDATE paradas
-          SET justificada = TRUE
-          WHERE id = $1
-          `,
-          [
-            data.paradaId
-          ]
+          return {
+            success: false,
+            message:
+              result.message ||
+              'Não foi possível registrar a justificativa.'
+          }
+        }
+
+        console.log('')
+        console.log(
+          'Justificativa registrada pela API:'
         )
 
-        console.log(
-          'Ocorrência registrada com sucesso:'
-        )
-
-        console.log(
-          occurrence
-        )
+        console.log(result.data)
 
         return {
           success: true,
-          data: occurrence
+          data: result.data
         }
       } catch (error) {
         console.error(
-          'Erro ao registrar ocorrência:',
+          'Erro ao enviar justificativa para a API:',
           error
         )
 
         return {
           success: false,
           message:
-            'Não foi possível registrar a ocorrência.'
+            'Não foi possível conectar à API para registrar a justificativa.'
         }
       }
     }
   )
 }
 
-async function createStop (
-  stop
-) {
+async function createStop (stop) {
   if (!currentOperator) {
     console.log('')
     console.log(
@@ -377,46 +380,160 @@ async function createStop (
     return null
   }
 
-  try {
-    const startedAt =
-      formatLocalDateTime(
-        stop.startedAt
-      )
+  if (currentOperator.perfil !== 'operador') {
+    console.log(
+      'Parada detectada, mas o usuário não é operador.'
+    )
 
-    const parada =
-      await db.one(
-        `
-        INSERT INTO paradas (
-          inicio,
-          justificada,
-          operador_id
-        )
-        VALUES (
-          $1::timestamp,
-          FALSE,
-          $2
-        )
-        RETURNING *
-        `,
-        [
-          startedAt,
-          currentOperator.id
-        ]
-      )
+    return null
+  }
+
+  try {
+    const startedAt = formatLocalDateTime(
+      stop.startedAt
+    )
 
     console.log('')
     console.log(
-      'Parada criada no banco:'
+      'Enviando criação da parada para a API...'
     )
 
-    console.log(
-      parada
+    const response = await fetch(
+      `${API_URL}/paradas`,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type': 'application/json'
+        },
+
+        body: JSON.stringify({
+          inicio: startedAt,
+          operadorId: currentOperator.id
+        })
+      }
     )
+
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      console.error(
+        'API recusou a criação da parada:',
+        result.message
+      )
+
+      return null
+    }
+
+    const parada = result.data
+
+    console.log('')
+    console.log(
+      'Parada criada pela API:'
+    )
+
+    console.log(parada)
 
     return parada
   } catch (error) {
     console.error(
-      'Erro ao criar parada:',
+      'Erro ao criar parada pela API:',
+      error
+    )
+
+    return null
+  }
+}
+
+async function finishStop (production) {
+  if (!activeStopId) {
+    console.log('')
+    console.log(
+      'START PROD detectado, mas não existe parada ativa.'
+    )
+
+    return null
+  }
+
+  try {
+    const finishedAt = formatLocalDateTime(
+      production.startedAt
+    )
+
+    console.log('')
+    console.log(
+      'Enviando finalização da parada para a API...'
+    )
+
+    const response = await fetch(
+      `${API_URL}/paradas/${activeStopId}/finalizar`,
+      {
+        method: 'PATCH',
+
+        headers: {
+          'Content-Type': 'application/json'
+        },
+
+        body: JSON.stringify({
+          fim: finishedAt,
+          duracaoSegundos: production.durationSeconds
+        })
+      }
+    )
+
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      console.error(
+        'API recusou a finalização:',
+        result.message
+      )
+
+      return null
+    }
+
+    const parada = result.data
+
+    console.log('')
+    console.log(
+      '================================'
+    )
+
+    console.log(
+      'PARADA FINALIZADA PELA API'
+    )
+
+    console.log(
+      'ID:',
+      parada.id
+    )
+
+    console.log(
+      'Início:',
+      parada.inicio
+    )
+
+    console.log(
+      'Fim:',
+      parada.fim
+    )
+
+    console.log(
+      'Duração:',
+      parada.duracao_segundos,
+      'segundos'
+    )
+
+    console.log(
+      '================================'
+    )
+
+    activeStopId = null
+
+    return parada
+  } catch (error) {
+    console.error(
+      'Erro ao finalizar parada pela API:',
       error
     )
 
@@ -425,116 +542,114 @@ async function createStop (
 }
 
 function initializeLogMonitor () {
-  const logFilePath =
-    path.resolve(
-      process.cwd(),
-      'src-electron',
-      'logs',
-      '20250106.dia'
-    )
+  const logFilePath = path.resolve(
+    process.cwd(),
+    'src-electron',
+    'logs',
+    '20250106.dia'
+  )
 
-  logMonitor =
-    startLogMonitor(
-      logFilePath,
-      {
-        stopThresholdMs: 10000,
+  logMonitor = startLogMonitor(
+    logFilePath,
+    {
+      stopThresholdMs: 10000,
 
-        onStopConfirmed:
-          async (stop) => {
-            console.log('')
 
-            console.log(
-              '================================'
-            )
+      onStopConfirmed: async (stop) => {
+        console.log('')
+        console.log(
+          '================================'
+        )
 
-            console.log(
-              'PARADA CONFIRMADA PELO SISTEMA'
-            )
+        console.log(
+          'PARADA CONFIRMADA PELO SISTEMA'
+        )
 
-            const startedAtLocal =
-              formatLocalDateTime(
-                stop.startedAt
-              )
+        const startedAtLocal =
+          formatLocalDateTime(
+            stop.startedAt
+          )
 
-            console.log(
-              'Início:',
-              startedAtLocal
-            )
+        console.log(
+          'Início:',
+          startedAtLocal
+        )
 
-            console.log(
-              'Operador:',
-              currentOperator
-                ? currentOperator.nome
-                : 'Nenhum operador logado'
-            )
+        console.log(
+          'Operador:',
+          currentOperator
+            ? currentOperator.nome
+            : 'Nenhum operador logado'
+        )
 
-            console.log(
-              'Alarmes:',
-              stop.alarms ?? []
-            )
+        console.log(
+          'Alarmes:',
+          stop.alarms ?? []
+        )
 
-            console.log(
-              '================================'
-            )
+        console.log(
+          '================================'
+        )
 
-            const parada =
-              await createStop(
-                stop
-              )
+        const parada = await createStop(
+          stop
+        )
 
-            if (
-              mainWindow &&
-              parada
-            ) {
-              mainWindow
-                .webContents
-                .send(
-                  'machine-stop-confirmed',
-                  {
-                    paradaId:
-                      parada.id,
+        if (parada) {
+          activeStopId = parada.id
+        }
 
-                    startedAt:
-                      startedAtLocal,
+        if (mainWindow && parada) {
+          mainWindow.webContents.send(
+            'machine-stop-confirmed',
+            {
+              paradaId: parada.id,
 
-                    operadorId:
-                      currentOperator.id,
+              startedAt: startedAtLocal,
 
-                    operadorNome:
-                      currentOperator.nome,
+              operadorId: currentOperator.id,
 
-                    alarms:
-                      stop.alarms ?? []
-                  }
-                )
+              operadorNome: currentOperator.nome,
 
-              console.log(
-                'Evento enviado para a interface.'
-              )
+              alarms: stop.alarms ?? []
             }
-          },
+          )
 
-        onProductionStopped:
-          (stop) => {
-            console.log(
-              'Produção interrompida em:',
-              formatLocalDateTime(
-                stop.startedAt
-              )
-            )
-          },
+          console.log(
+            'Evento enviado para a interface.'
+          )
+        }
+      },
 
-        onProductionStarted:
-          (production) => {
-            console.log(
-              'Produção iniciada em:',
-              formatLocalDateTime(
-                production.startedAt
-              )
-            )
-          }
+      onProductionStopped: (stop) => {
+        console.log(
+          'Produção interrompida em:',
+          formatLocalDateTime(
+            stop.startedAt
+          )
+        )
+      },
+
+      onProductionStarted: async (production) => {
+        console.log(
+          'Produção iniciada em:',
+          formatLocalDateTime(
+            production.startedAt
+          )
+        )
+
+        if (production.stopConfirmed) {
+          await finishStop(
+            production
+          )
+        } else {
+          console.log(
+            'Não existe parada confirmada para finalizar.'
+          )
+        }
       }
-    )
+    }
+  )
 }
 
 app.whenReady().then(
@@ -543,7 +658,7 @@ app.whenReady().then(
 
     await createWindow()
 
-    await testDatabaseConnection()
+    await testApiConnection()
 
     initializeLogMonitor()
   }
@@ -556,9 +671,7 @@ app.on(
       logMonitor.stop()
     }
 
-    if (
-      platform !== 'darwin'
-    ) {
+    if (platform !== 'darwin') {
       app.quit()
     }
   }
@@ -567,9 +680,7 @@ app.on(
 app.on(
   'activate',
   () => {
-    if (
-      mainWindow === null
-    ) {
+    if (mainWindow === null) {
       createWindow()
     }
   }
