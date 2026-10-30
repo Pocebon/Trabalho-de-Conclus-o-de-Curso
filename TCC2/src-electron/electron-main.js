@@ -32,6 +32,7 @@ let mainWindow
 let logMonitor
 let currentOperator = null
 let activeStopId = null
+let pendingStopCreation = null
 
 function padNumber (value) {
   return String(value).padStart(2, '0')
@@ -542,18 +543,16 @@ async function finishStop (production) {
 }
 
 function initializeLogMonitor () {
-  const logFilePath = path.resolve(
-    process.cwd(),
-    'src-electron',
-    'logs',
-    '20250106.dia'
-  )
+  // No computador da máquina, lê os relatórios locais do Xilog Plus.
+  // Para testes, defina XILOG_LOG_FILE com o caminho de um .dia específico.
+  const logSource = process.env.XILOG_LOG_FILE ||
+    process.env.XILOG_REPORT_DIR ||
+    'C:\\Program Files (x86)\\Scm Group\\Xilog Plus\\Report'
 
   logMonitor = startLogMonitor(
-    logFilePath,
+    logSource,
     {
       stopThresholdMs: 10000,
-
 
       onStopConfirmed: async (stop) => {
         console.log('')
@@ -591,9 +590,9 @@ function initializeLogMonitor () {
           '================================'
         )
 
-        const parada = await createStop(
-          stop
-        )
+        const creation = createStop(stop)
+        pendingStopCreation = creation
+        const parada = await creation
 
         if (parada) {
           activeStopId = parada.id
@@ -639,9 +638,12 @@ function initializeLogMonitor () {
         )
 
         if (production.stopConfirmed) {
+          // Aguarda a criação da parada antes de tentar finalizá-la.
+          if (pendingStopCreation) await pendingStopCreation
           await finishStop(
             production
           )
+          pendingStopCreation = null
         } else {
           console.log(
             'Não existe parada confirmada para finalizar.'

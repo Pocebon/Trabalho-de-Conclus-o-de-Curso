@@ -11,9 +11,7 @@
           Parada de máquina detectada
         </div>
 
-        <div
-          class="text-grey-7 q-mt-sm"
-        >
+        <div class="text-grey-7 q-mt-sm">
           A máquina permanece parada
           acima do tempo permitido.
         </div>
@@ -22,6 +20,7 @@
       <q-separator />
 
       <q-card-section>
+
         <div class="q-mb-md">
           <strong>
             Início da parada:
@@ -49,6 +48,7 @@
           emit-value
           map-options
           :loading="loadingReasons"
+          :disable="loadingReasons"
         />
 
         <q-input
@@ -78,16 +78,17 @@
             }}
           </div>
         </div>
+
       </q-card-section>
 
-      <q-card-actions
-        align="right"
-      >
+      <q-card-actions align="right">
+
         <q-btn
           label="Registrar motivo"
           color="primary"
           :loading="saving"
           :disable="
+            loadingReasons ||
             !selectedReason ||
             saving ||
             (
@@ -97,7 +98,9 @@
           "
           @click="registerReason"
         />
+
       </q-card-actions>
+
     </q-card>
   </q-dialog>
 </template>
@@ -116,38 +119,31 @@ import {
 
 const $q = useQuasar()
 
-const dialogOpen =
-  ref(false)
+const dialogOpen = ref(false)
 
-const selectedReason =
-  ref(null)
+const selectedReason = ref(null)
 
-const observation =
-  ref('')
+const observation = ref('')
 
-const stopStartedAt =
-  ref(null)
+const stopStartedAt = ref(null)
 
-const paradaId =
-  ref(null)
+const paradaId = ref(null)
 
-const operatorName =
-  ref('')
+const operatorName = ref('')
 
-const alarms =
-  ref([])
+const alarms = ref([])
 
-const reasons =
-  ref([])
+const reasons = ref([])
 
-const loadingReasons =
-  ref(false)
+const loadingReasons = ref(false)
 
-const saving =
-  ref(false)
+const saving = ref(false)
 
-let removeStopListener =
-  null
+let removeStopListener = null
+
+// ==================================================
+// MOTIVO SELECIONADO
+// ==================================================
 
 const selectedReasonObject =
   computed(() => {
@@ -157,6 +153,10 @@ const selectedReasonObject =
         selectedReason.value
     )
   })
+
+// ==================================================
+// VERIFICAR SE O MOTIVO É "OUTRO"
+// ==================================================
 
 const isOtherReason =
   computed(() => {
@@ -168,6 +168,10 @@ const isOtherReason =
       'outro'
     )
   })
+
+// ==================================================
+// FORMATAR DATA/HORA DA PARADA
+// ==================================================
 
 const formattedStartedAt =
   computed(() => {
@@ -200,11 +204,23 @@ const formattedStartedAt =
     )
   })
 
+// ==================================================
+// CARREGAR MOTIVOS
+// ==================================================
+
 async function loadReasons () {
-  loadingReasons.value =
-    true
+  loadingReasons.value = true
 
   try {
+    if (
+      !window.electronAPI
+        ?.getStopReasons
+    ) {
+      throw new Error(
+        'API do Electron não disponível.'
+      )
+    }
+
     const response =
       await window
         .electronAPI
@@ -226,6 +242,7 @@ async function loadReasons () {
             reason.id
         })
       )
+
   } catch (error) {
     console.error(
       'Erro ao carregar motivos:',
@@ -237,13 +254,18 @@ async function loadReasons () {
       message:
         'Erro ao carregar motivos de parada.'
     })
+
   } finally {
-    loadingReasons.value =
-      false
+    loadingReasons.value = false
   }
 }
 
+// ==================================================
+// REGISTRAR JUSTIFICATIVA
+// ==================================================
+
 async function registerReason () {
+
   if (!paradaId.value) {
     $q.notify({
       type: 'negative',
@@ -265,10 +287,18 @@ async function registerReason () {
     return
   }
 
-  saving.value =
-    true
+  saving.value = true
 
   try {
+    if (
+      !window.electronAPI
+        ?.registerStopReason
+    ) {
+      throw new Error(
+        'API do Electron não disponível.'
+      )
+    }
+
     const response =
       await window
         .electronAPI
@@ -295,26 +325,21 @@ async function registerReason () {
         'Motivo registrado com sucesso.'
     })
 
-    dialogOpen.value =
-      false
+    // LIMPAR MODAL
+    dialogOpen.value = false
 
-    paradaId.value =
-      null
+    paradaId.value = null
 
-    stopStartedAt.value =
-      null
+    stopStartedAt.value = null
 
-    operatorName.value =
-      ''
+    operatorName.value = ''
 
-    selectedReason.value =
-      null
+    selectedReason.value = null
 
-    observation.value =
-      ''
+    observation.value = ''
 
-    alarms.value =
-      []
+    alarms.value = []
+
   } catch (error) {
     console.error(
       'Erro ao registrar motivo:',
@@ -324,64 +349,71 @@ async function registerReason () {
     $q.notify({
       type: 'negative',
       message:
+        error.message ||
         'Erro ao registrar motivo da parada.'
     })
+
   } finally {
-    saving.value =
-      false
+    saving.value = false
   }
 }
 
-onMounted(
-  async () => {
-    await loadReasons()
+// ==================================================
+// ESCUTAR PARADA CONFIRMADA PELO ELECTRON
+// ==================================================
 
-    if (
+onMounted(() => {
+
+  if (
+    window.electronAPI
+      ?.onMachineStopConfirmed
+  ) {
+    removeStopListener =
       window
         .electronAPI
-        ?.onMachineStopConfirmed
-    ) {
-      removeStopListener =
-        window
-          .electronAPI
-          .onMachineStopConfirmed(
-            stop => {
-              console.log(
-                'Parada recebida do Electron:',
-                stop
-              )
+        .onMachineStopConfirmed(
+          async stop => {
 
-              paradaId.value =
-                stop.paradaId
+            console.log(
+              'Parada recebida do Electron:',
+              stop
+            )
 
-              stopStartedAt.value =
-                stop.startedAt
+            paradaId.value =
+              stop.paradaId
 
-              operatorName.value =
-                stop.operadorNome || ''
+            stopStartedAt.value =
+              stop.startedAt
 
-              alarms.value =
-                stop.alarms ?? []
+            operatorName.value =
+              stop.operadorNome || ''
 
-              selectedReason.value =
-                null
+            alarms.value =
+              stop.alarms ?? []
 
-              observation.value =
-                ''
+            selectedReason.value =
+              null
 
-              dialogOpen.value =
-                true
-            }
-          )
-    }
+            observation.value =
+              ''
+
+            // Busca os motivos SOMENTE
+            // quando existe uma parada.
+            await loadReasons()
+
+            dialogOpen.value = true
+          }
+        )
   }
-)
+})
 
-onBeforeUnmount(
-  () => {
-    if (removeStopListener) {
-      removeStopListener()
-    }
+// ==================================================
+// REMOVER LISTENER
+// ==================================================
+
+onBeforeUnmount(() => {
+  if (removeStopListener) {
+    removeStopListener()
   }
-)
+})
 </script>

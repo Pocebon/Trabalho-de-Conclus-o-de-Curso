@@ -1,7 +1,7 @@
+
 <template>
   <q-page class="login-page flex flex-center">
     <q-card class="login-card">
-
       <q-card-section class="text-center q-pb-none">
         <q-icon
           name="precision_manufacturing"
@@ -23,7 +23,6 @@
           @submit="onLogin"
           class="q-gutter-md"
         >
-
           <q-input
             v-model="email"
             label="E-mail"
@@ -32,9 +31,7 @@
             dark
             color="primary"
             :rules="[
-              val =>
-                !!val ||
-                'Informe o e-mail'
+              val => !!val || 'Informe o e-mail'
             ]"
           >
             <template #prepend>
@@ -45,18 +42,12 @@
           <q-input
             v-model="senha"
             label="Senha"
-            :type="
-              mostrarSenha
-                ? 'text'
-                : 'password'
-            "
+            :type="mostrarSenha ? 'text' : 'password'"
             outlined
             dark
             color="primary"
             :rules="[
-              val =>
-                !!val ||
-                'Informe a senha'
+              val => !!val || 'Informe a senha'
             ]"
           >
             <template #prepend>
@@ -65,16 +56,9 @@
 
             <template #append>
               <q-icon
-                :name="
-                  mostrarSenha
-                    ? 'visibility_off'
-                    : 'visibility'
-                "
+                :name="mostrarSenha ? 'visibility_off' : 'visibility'"
                 class="cursor-pointer"
-                @click="
-                  mostrarSenha =
-                    !mostrarSenha
-                "
+                @click="mostrarSenha = !mostrarSenha"
               />
             </template>
           </q-input>
@@ -87,98 +71,113 @@
             size="lg"
             :loading="carregando"
           />
-
         </q-form>
       </q-card-section>
-
     </q-card>
   </q-page>
 </template>
 
 <script setup>
-import {
-  ref
-} from 'vue'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useQuasar } from 'quasar'
 
-import {
-  useRouter
-} from 'vue-router'
+const router = useRouter()
+const $q = useQuasar()
 
-import {
-  useQuasar
-} from 'quasar'
+const email = ref('')
+const senha = ref('')
+const mostrarSenha = ref(false)
+const carregando = ref(false)
 
-const router =
-  useRouter()
+const API_URL = 'http://localhost:3000/api'
 
-const $q =
-  useQuasar()
+async function autenticarNaAPI(credenciais) {
+  const resposta = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(credenciais)
+  })
 
-const email =
-  ref('')
+  const resultado = await resposta.json()
 
-const senha =
-  ref('')
+  if (!resposta.ok || !resultado.success) {
+    throw new Error(
+      resultado.message || 'E-mail ou senha inválidos.'
+    )
+  }
 
-const mostrarSenha =
-  ref(false)
+  return resultado
+}
 
-const carregando =
-  ref(false)
-
-async function onLogin () {
+async function onLogin() {
   carregando.value = true
 
   try {
-    const response =
-      await window
-        .electronAPI
-        .loginUser({
-          email:
-            email.value.trim(),
-
-          senha:
-            senha.value
-        })
-
-    if (!response.success) {
-      $q.notify({
-        type: 'negative',
-        message:
-          response.message
-      })
-
-      return
+    const credenciais = {
+      email: email.value.trim(),
+      senha: senha.value
     }
 
-    console.log(
-      'Usuário logado:',
-      response.user
+    let response
+
+    // Preserva a integração com o Electron.
+    if (window.electronAPI?.loginUser) {
+      response = await window.electronAPI.loginUser(credenciais)
+    } else {
+      response = await autenticarNaAPI(credenciais)
+    }
+
+    if (!response?.success || !response.user) {
+      throw new Error(
+        response?.message || 'E-mail ou senha inválidos.'
+      )
+    }
+
+    // Obtém o JWT caso a ponte Electron ainda não o retorne.
+    let token = response.token
+
+    if (!token) {
+      const autenticacao = await autenticarNaAPI(credenciais)
+      token = autenticacao.token
+    }
+
+    if (!token) {
+      throw new Error('Não foi possível obter o token de autenticação.')
+    }
+
+    if (!['gestor', 'operador'].includes(response.user.perfil)) {
+      throw new Error('Perfil de usuário inválido.')
+    }
+
+    sessionStorage.setItem(
+      'usuario',
+      JSON.stringify(response.user)
     )
+
+    sessionStorage.setItem('token', token)
 
     $q.notify({
       type: 'positive',
-      message:
-        `Bem-vindo, ${response.user.nome}!`
+      message: `Bem-vindo, ${response.user.nome}!`
     })
 
-    await router.push(
-      '/dashboard'
-    )
+    if (response.user.perfil === 'gestor') {
+      await router.push('/dashboard')
+    } else {
+      await router.push('/operador')
+    }
   } catch (error) {
-    console.error(
-      'Erro no login:',
-      error
-    )
+    console.error('Erro no login:', error)
 
     $q.notify({
       type: 'negative',
-      message:
-        'Erro ao realizar login.'
+      message: error.message || 'Erro ao realizar login.'
     })
   } finally {
-    carregando.value =
-      false
+    carregando.value = false
   }
 }
 </script>
