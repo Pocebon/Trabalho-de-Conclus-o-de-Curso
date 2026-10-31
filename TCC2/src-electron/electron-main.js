@@ -543,11 +543,7 @@ async function finishStop (production) {
 }
 
 function initializeLogMonitor () {
-  // No computador da máquina, lê os relatórios locais do Xilog Plus.
-  // Para testes, defina XILOG_LOG_FILE com o caminho de um .dia específico.
-  const logSource = process.env.XILOG_LOG_FILE ||
-    process.env.XILOG_REPORT_DIR ||
-    'C:\\Program Files (x86)\\Scm Group\\Xilog Plus\\Report'
+  const logSource = 'C:\\TCC2\\TesteXilog\\teste.dia'
 
   logMonitor = startLogMonitor(
     logSource,
@@ -638,7 +634,6 @@ function initializeLogMonitor () {
         )
 
         if (production.stopConfirmed) {
-          // Aguarda a criação da parada antes de tentar finalizá-la.
           if (pendingStopCreation) await pendingStopCreation
           await finishStop(
             production

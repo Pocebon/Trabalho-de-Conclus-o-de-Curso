@@ -55,8 +55,6 @@ yarn-error.log*
 *.dump
 *.sql.gz
 
-# Arquivos ZIP temporários
-src.zip
 
 # Arquivos temporários
 tmp/

@@ -58,7 +58,7 @@ export default defineConfig((/* ctx */) => {
       // extendViteConf (viteConf) {},
       // viteVuePluginOptions: {},
 
-      vitePlugins: [ ],
+      vitePlugins: [],
     },
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#devserver
@@ -77,8 +77,10 @@ export default defineConfig((/* ctx */) => {
       // components: [],
       // directives: [],
 
+      // Plugins utilizados pelo sistema
       plugins: [
         'Notify',
+        'Dialog',
       ],
     },
 
@@ -90,7 +92,7 @@ export default defineConfig((/* ctx */) => {
     //   rootComponent: 'src/App.vue',
     //   router: 'src/router/index',
     //   store: 'src/store/index',
-    //   pwaRegisterServiceWorker: 'src-pwa/pwa-register',
+    //   pwaRegisterServiceWorker: 'src-pwa/register-service-worker',
     //   pwaServiceWorker: 'src-pwa/custom-service-worker',
     //   pwaManifestFile: 'src-pwa/manifest.json',
     //   electronMain: 'src-electron/electron-main',
@@ -110,8 +112,6 @@ export default defineConfig((/* ctx */) => {
       // extendSSRWebserverConf (esbuildConf) {},
 
       // manualStoreSerialization: true,
-      // manualStoreSsrContextInjection: true,
-      // manualStoreHydration: true,
       // manualStoreHydration: true,
 
       pwa: false,
@@ -192,7 +192,7 @@ export default defineConfig((/* ctx */) => {
 
     // https://v2.quasar.dev/quasar-cli-vite/developing-browser-extensions/configuring-bex
     bex: {
-      // extendBexScriptsConf (esbuildConf) {},
+      // extendBexScriptsConf (bexConf) {},
       // extendBexManifestJson (bexManifest) {},
 
       extraScripts: [],

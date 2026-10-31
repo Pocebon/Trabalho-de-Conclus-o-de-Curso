@@ -25,7 +25,9 @@ const PORT = process.env.API_PORT || 3000
 app.use(cors({
   origin: [
     'http://localhost:9000',
-    'http://127.0.0.1:9000'
+    'http://127.0.0.1:9000',
+    'http://localhost:9300',
+    'http://127.0.0.1:9300'
   ],
   methods: [
     'GET',

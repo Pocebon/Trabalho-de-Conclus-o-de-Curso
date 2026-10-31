@@ -2,8 +2,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-// Monitora o arquivo diário do Xilog sem alterar os eventos utilizados pela aplicação.
-// Também aceita um caminho fixo para testes locais.
 export function startLogMonitor(
   logSource,
   {
@@ -62,7 +60,7 @@ export function startLogMonitor(
     if (stopped || machineState !== 'STOP' || stopConfirmed) return
 
     stopConfirmed = true
-    console.log('🚨 PARADA ULTRAPASSOU O LIMITE')
+    console.log('PARADA ULTRAPASSOU O LIMITE')
 
     onStopConfirmed?.({
       startedAt: stopStartedAt,
@@ -111,8 +109,6 @@ export function startLogMonitor(
         Math.floor((eventDate - startedAt) / 1000)
       )
 
-      // Se o START chegou junto com o STOP em uma leitura atrasada,
-      // o tempo registrado no log determina se a parada ultrapassou o limite.
       if (!stopConfirmed && eventDate - startedAt >= stopThresholdMs) {
         confirmStop()
       }
@@ -214,8 +210,6 @@ export function startLogMonitor(
       return
     }
 
-    // Na primeira inicialização, mantém o comportamento original:
-    // ignora registros históricos e acompanha somente novos eventos.
     if (initial) {
       offset = fs.statSync(file).size
       console.log('Monitor posicionado no final do arquivo:', file)
