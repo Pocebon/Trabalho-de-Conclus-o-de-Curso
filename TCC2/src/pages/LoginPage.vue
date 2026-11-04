@@ -30,6 +30,7 @@
             outlined
             dark
             color="primary"
+            autocomplete="username"
             :rules="[
               val => !!val || 'Informe o e-mail'
             ]"
@@ -46,6 +47,7 @@
             outlined
             dark
             color="primary"
+            autocomplete="current-password"
             :rules="[
               val => !!val || 'Informe a senha'
             ]"
@@ -81,6 +83,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
+import { api } from 'src/boot/axios'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -90,29 +93,45 @@ const senha = ref('')
 const mostrarSenha = ref(false)
 const carregando = ref(false)
 
-const API_URL = 'http://localhost:3000/api'
-
+// Autenticação pela API centralizada no axios.js
 async function autenticarNaAPI(credenciais) {
-  const resposta = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(credenciais)
-  })
+  try {
+    const { data } = await api.post('/auth/login', credenciais)
 
-  const resultado = await resposta.json()
+    if (!data?.success) {
+      throw new Error(
+        data?.message || 'E-mail ou senha inválidos.'
+      )
+    }
 
-  if (!resposta.ok || !resultado.success) {
-    throw new Error(
-      resultado.message || 'E-mail ou senha inválidos.'
-    )
+    return data
+  } catch (error) {
+    if (error.response) {
+      throw new Error(
+        error.response.data?.message ||
+        'E-mail ou senha inválidos.'
+      )
+    }
+
+    if (error.code === 'ECONNABORTED') {
+      throw new Error(
+        'A conexão demorou muito. Tente novamente.'
+      )
+    }
+
+    if (error.code === 'ERR_NETWORK') {
+      throw new Error(
+        'Não foi possível conectar ao servidor. Verifique sua internet.'
+      )
+    }
+
+    throw error
   }
-
-  return resultado
 }
 
 async function onLogin() {
+  if (carregando.value) return
+
   carregando.value = true
 
   try {
@@ -123,7 +142,7 @@ async function onLogin() {
 
     let response
 
-    // Preserva a integração com o Electron.
+    // Mantém a integração com o aplicativo Electron.
     if (window.electronAPI?.loginUser) {
       response = await window.electronAPI.loginUser(credenciais)
     } else {
@@ -136,7 +155,7 @@ async function onLogin() {
       )
     }
 
-    // Obtém o JWT caso a ponte Electron ainda não o retorne.
+    // Mantém a recuperação do JWT utilizada no projeto.
     let token = response.token
 
     if (!token) {
@@ -145,7 +164,9 @@ async function onLogin() {
     }
 
     if (!token) {
-      throw new Error('Não foi possível obter o token de autenticação.')
+      throw new Error(
+        'Não foi possível obter o token de autenticação.'
+      )
     }
 
     if (!['gestor', 'operador'].includes(response.user.perfil)) {

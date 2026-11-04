@@ -26,7 +26,7 @@ const currentDir =
   )
 
 const API_URL =
-  'http://localhost:3000/api'
+  'https://tcc-paradas-api.onrender.com/api'
 
 let mainWindow
 let logMonitor
@@ -548,7 +548,7 @@ function initializeLogMonitor () {
   logMonitor = startLogMonitor(
     logSource,
     {
-      stopThresholdMs: 10000,
+      stopThresholdMs: 420000,
 
       onStopConfirmed: async (stop) => {
         console.log('')

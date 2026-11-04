@@ -5,14 +5,18 @@ import path from 'node:path'
 export function startLogMonitor(
   logSource,
   {
-    stopThresholdMs = 10000,
+    stopThresholdMs = 420000,
     onStopConfirmed = null,
     onProductionStarted = null,
     onProductionStopped = null
   } = {}
 ) {
-  const fixedFile = typeof logSource === 'string' && /\.dia$/i.test(logSource)
-  const reportDirectory = fixedFile ? path.dirname(logSource) : logSource
+  const fixedFile =
+    typeof logSource === 'string' && /\.dia$/i.test(logSource)
+
+  const reportDirectory = fixedFile
+    ? path.dirname(logSource)
+    : logSource
 
   let currentFile = null
   let offset = 0
@@ -28,19 +32,32 @@ export function startLogMonitor(
 
   function dailyFile(date) {
     if (fixedFile) return logSource
+
     const yyyy = String(date.getFullYear())
     const mm = String(date.getMonth() + 1).padStart(2, '0')
     const dd = String(date.getDate()).padStart(2, '0')
-    return path.join(reportDirectory, yyyy, `${yyyy}${mm}${dd}.dia`)
+
+    return path.join(
+      reportDirectory,
+      yyyy,
+      `${yyyy}${mm}${dd}.dia`
+    )
   }
 
   function eventDateFromLine(file, hh, mm, ss) {
-    const match = path.basename(file).match(/^(\d{4})(\d{2})(\d{2})\.dia$/i)
+    const match = path.basename(file).match(
+      /^(\d{4})(\d{2})(\d{2})\.dia$/i
+    )
+
     const base = match
-      ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+      ? new Date(
+          Number(match[1]),
+          Number(match[2]) - 1,
+          Number(match[3])
+        )
       : new Date()
 
-    return new Date(
+    let eventDate = new Date(
       base.getFullYear(),
       base.getMonth(),
       base.getDate(),
@@ -48,37 +65,90 @@ export function startLogMonitor(
       Number(mm),
       Number(ss)
     )
+
+    // No arquivo fixo de testes, considera a virada
+    // de meia-noite durante uma parada.
+    if (
+      fixedFile &&
+      stopStartedAt &&
+      machineState === 'STOP' &&
+      eventDate < stopStartedAt
+    ) {
+      eventDate = new Date(eventDate)
+      eventDate.setDate(eventDate.getDate() + 1)
+    }
+
+    return eventDate
   }
 
   function clearStopTimer() {
-    if (stopTimer) clearTimeout(stopTimer)
+    if (stopTimer) {
+      clearTimeout(stopTimer)
+    }
+
     stopTimer = null
   }
 
   function confirmStop() {
-    stopTimer = null
-    if (stopped || machineState !== 'STOP' || stopConfirmed) return
+    clearStopTimer()
+
+    if (
+      stopped ||
+      machineState !== 'STOP' ||
+      stopConfirmed ||
+      !stopStartedAt
+    ) {
+      return false
+    }
 
     stopConfirmed = true
+
     console.log('PARADA ULTRAPASSOU O LIMITE')
 
-    onStopConfirmed?.({
-      startedAt: stopStartedAt,
-      alarms: [...alarmsDuringStop]
-    })
+    try {
+      const result = onStopConfirmed?.({
+        startedAt: stopStartedAt,
+        alarms: [...alarmsDuringStop]
+      })
+
+      Promise.resolve(result).catch(error => {
+        console.error(
+          'Erro ao confirmar parada:',
+          error
+        )
+      })
+    } catch (error) {
+      console.error(
+        'Erro ao confirmar parada:',
+        error
+      )
+    }
+
+    return true
   }
 
   function scheduleStopConfirmation() {
     clearStopTimer()
 
-    if (!stopStartedAt || stopConfirmed || machineState !== 'STOP') return
+    if (
+      !stopStartedAt ||
+      stopConfirmed ||
+      machineState !== 'STOP'
+    ) {
+      return
+    }
 
-    const remaining = stopThresholdMs - (Date.now() - stopStartedAt.getTime())
+    const remaining =
+      stopThresholdMs -
+      (Date.now() - stopStartedAt.getTime())
 
     if (remaining <= 0) {
       confirmStop()
     } else {
-      stopTimer = setTimeout(confirmStop, remaining)
+      stopTimer = setTimeout(
+        confirmStop,
+        remaining
+      )
     }
   }
 
@@ -91,11 +161,14 @@ export function startLogMonitor(
     alarmsDuringStop = []
 
     console.log(
-      '⚠ POSSÍVEL PARADA DETECTADA:',
+      'POSSÍVEL PARADA DETECTADA:',
       eventDate.toLocaleString('pt-BR')
     )
 
-    onProductionStopped?.({ startedAt: eventDate })
+    onProductionStopped?.({
+      startedAt: eventDate
+    })
+
     scheduleStopConfirmation()
   }
 
@@ -104,20 +177,32 @@ export function startLogMonitor(
       clearStopTimer()
 
       const startedAt = stopStartedAt
-      const durationSeconds = Math.max(
+
+      const durationMs = Math.max(
         0,
-        Math.floor((eventDate - startedAt) / 1000)
+        eventDate.getTime() - startedAt.getTime()
       )
 
-      if (!stopConfirmed && eventDate - startedAt >= stopThresholdMs) {
+      const durationSeconds = Math.floor(
+        durationMs / 1000
+      )
+
+      // Confirma pelo horário real dos eventos,
+      // mesmo se o temporizador não tiver disparado.
+      if (
+        !stopConfirmed &&
+        durationMs >= stopThresholdMs
+      ) {
         confirmStop()
       }
+
+      const wasConfirmed = stopConfirmed
 
       onProductionStarted?.({
         startedAt: eventDate,
         stopStartedAt: startedAt,
         durationSeconds,
-        stopConfirmed
+        stopConfirmed: wasConfirmed
       })
     } else {
       onProductionStarted?.({
@@ -143,23 +228,25 @@ export function startLogMonitor(
     )
 
     if (production) {
-      const date = eventDateFromLine(
+      const eventDate = eventDateFromLine(
         file,
         production[2],
         production[3],
         production[4]
       )
 
+      const type = production[1].toUpperCase()
+
       console.log(
         'Evento produção:',
-        production[1].toUpperCase(),
-        date.toLocaleString('pt-BR')
+        type,
+        eventDate.toLocaleString('pt-BR')
       )
 
-      if (production[1].toUpperCase() === 'STOP') {
-        handleProductionStop(date)
+      if (type === 'STOP') {
+        handleProductionStop(eventDate)
       } else {
-        handleProductionStart(date)
+        handleProductionStart(eventDate)
       }
 
       return
@@ -179,23 +266,32 @@ export function startLogMonitor(
         ),
         message: null
       }
+
       return
     }
 
-    const alarmMessage = clean.match(/^ALRM,(.+)$/i)
+    const alarmMessage = clean.match(
+      /^ALRM,(.+)$/i
+    )
 
     if (alarmMessage) {
       if (currentAlarm) {
-        currentAlarm.message = alarmMessage[1].trim()
+        currentAlarm.message =
+          alarmMessage[1].trim()
 
         if (machineState === 'STOP') {
-          alarmsDuringStop.push({ ...currentAlarm })
+          alarmsDuringStop.push({
+            ...currentAlarm
+          })
         }
       }
+
       return
     }
 
-    if (/^STOP\s+ALRM,\d{2},\d{2},\d{2}$/i.test(clean)) {
+    if (
+      /^STOP\s+ALRM,\d{2},\d{2},\d{2}$/i.test(clean)
+    ) {
       currentAlarm = null
     }
   }
@@ -206,15 +302,25 @@ export function startLogMonitor(
     offset = 0
 
     if (!fs.existsSync(file)) {
-      console.log('Aguardando arquivo .dia:', file)
+      console.log(
+        'Aguardando arquivo .dia:',
+        file
+      )
       return
     }
 
     if (initial) {
       offset = fs.statSync(file).size
-      console.log('Monitor posicionado no final do arquivo:', file)
+
+      console.log(
+        'Monitor posicionado no final do arquivo:',
+        file
+      )
     } else {
-      console.log('Monitorando novo arquivo diário:', file)
+      console.log(
+        'Monitorando novo arquivo diário:',
+        file
+      )
     }
   }
 
@@ -227,7 +333,10 @@ export function startLogMonitor(
       const desired = dailyFile(new Date())
 
       if (desired !== currentFile) {
-        resetFilePosition(desired, currentFile === null)
+        resetFilePosition(
+          desired,
+          currentFile === null
+        )
       }
 
       if (!fs.existsSync(currentFile)) return
@@ -235,7 +344,10 @@ export function startLogMonitor(
       const size = fs.statSync(currentFile).size
 
       if (size < offset) {
-        console.log('Arquivo reduzido ou substituído; reiniciando posição.')
+        console.log(
+          'Arquivo reduzido ou substituído; reiniciando posição.'
+        )
+
         offset = 0
         pending = Buffer.alloc(0)
       }
@@ -246,7 +358,11 @@ export function startLogMonitor(
 
       try {
         while (offset < size) {
-          const length = Math.min(64 * 1024, size - offset)
+          const length = Math.min(
+            64 * 1024,
+            size - offset
+          )
+
           const buffer = Buffer.allocUnsafe(length)
 
           const read = fs.readSync(
@@ -268,27 +384,40 @@ export function startLogMonitor(
 
           let newline
 
-          while ((newline = pending.indexOf(10)) !== -1) {
+          while (
+            (newline = pending.indexOf(10)) !== -1
+          ) {
             const line = pending
               .subarray(0, newline)
               .toString('latin1')
 
-            pending = pending.subarray(newline + 1)
+            pending = pending.subarray(
+              newline + 1
+            )
 
-            processLine(line, currentFile)
+            processLine(
+              line,
+              currentFile
+            )
           }
         }
       } finally {
         fs.closeSync(fd)
       }
     } catch (error) {
-      console.error('Erro ao acompanhar arquivo .dia:', error)
+      console.error(
+        'Erro ao acompanhar arquivo .dia:',
+        error
+      )
     } finally {
       busy = false
     }
   }
 
-  console.log('MONITOR DO ARQUIVO .DIA INICIADO:', reportDirectory)
+  console.log(
+    'MONITOR DO ARQUIVO .DIA INICIADO:',
+    reportDirectory
+  )
 
   poll()
 
@@ -299,7 +428,10 @@ export function startLogMonitor(
       stopped = true
       clearInterval(interval)
       clearStopTimer()
-      console.log('Monitor do arquivo .dia encerrado.')
+
+      console.log(
+        'Monitor do arquivo .dia encerrado.'
+      )
     }
   }
 }

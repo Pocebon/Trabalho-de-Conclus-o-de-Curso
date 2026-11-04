@@ -253,9 +253,7 @@ import { useRouter } from 'vue-router'
 const $q = useQuasar()
 const router = useRouter()
 
-// A API será executada no computador do gestor.
-// O endereço deverá ser configurado para a implantação.
-const API_URL = 'http://localhost:3000/api'
+const API_URL = 'https://tcc-paradas-api.onrender.com/api'
 
 const operadores = ref([])
 const filtro = ref('')

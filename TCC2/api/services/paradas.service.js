@@ -8,12 +8,13 @@ function criarErro(message, statusCode) {
   return error
 }
 
+
 export async function listarParadas() {
   const result = await pool.query(`
     SELECT
       p.id,
-      p.inicio,
-      p.fim,
+      p.inicio AT TIME ZONE 'America/Sao_Paulo' AS inicio,
+      p.fim AT TIME ZONE 'America/Sao_Paulo' AS fim,
       p.duracao_segundos,
       p.justificada,
 
@@ -64,6 +65,7 @@ export async function listarParadas() {
     registradoEm: parada.registrado_em
   }))
 }
+
 
 export async function criarParada({
   inicio,

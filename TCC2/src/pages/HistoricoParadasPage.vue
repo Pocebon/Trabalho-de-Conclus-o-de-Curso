@@ -1,7 +1,6 @@
+
 <template>
   <q-page class="q-pa-lg">
-
-    <!-- CABEÇALHO -->
     <div class="row items-center justify-between q-mb-lg">
       <div>
         <div class="text-h4 text-weight-bold">
@@ -24,7 +23,6 @@
 
     <!-- CARDS -->
     <div class="row q-col-gutter-md q-mb-lg">
-
       <div class="col-12 col-sm-6 col-md-3">
         <q-card flat bordered class="full-height">
           <q-card-section>
@@ -80,12 +78,9 @@
           </q-card-section>
         </q-card>
       </div>
-
     </div>
 
-    <!-- TABELA -->
     <q-card flat bordered>
-
       <q-table
         title="Paradas registradas"
         :rows="paradas"
@@ -97,8 +92,6 @@
         no-data-label="Nenhuma parada encontrada."
         no-results-label="Nenhuma parada encontrada para a pesquisa."
       >
-
-        <!-- PESQUISA -->
         <template #top-right>
           <q-input
             v-model="filtro"
@@ -113,10 +106,8 @@
           </q-input>
         </template>
 
-        <!-- SITUAÇÃO -->
         <template #body-cell-situacao="props">
           <q-td :props="props">
-
             <q-badge
               v-if="props.row.justificada"
               color="positive"
@@ -128,50 +119,32 @@
               color="negative"
               label="Não justificada"
             />
-
           </q-td>
         </template>
 
         <!-- MOTIVO -->
         <template #body-cell-motivo="props">
           <q-td :props="props">
-
             <span v-if="props.row.motivo">
               {{ props.row.motivo.descricao }}
             </span>
 
-            <span
-              v-else
-              class="text-grey-6"
-            >
+            <span v-else class="text-grey-6">
               Não informado
             </span>
-
           </q-td>
         </template>
-
       </q-table>
-
     </q-card>
-
   </q-page>
 </template>
 
 <script setup>
-import {
-  computed,
-  onMounted,
-  ref
-} from 'vue'
-
-import {
-  useQuasar
-} from 'quasar'
+import { computed, onMounted, ref } from 'vue'
+import { useQuasar } from 'quasar'
+import { api } from 'src/boot/axios'
 
 const $q = useQuasar()
-
-const API_URL =
-  'http://localhost:3000/api'
 
 const paradas = ref([])
 const loading = ref(false)
@@ -184,9 +157,6 @@ const pagination = ref({
   rowsPerPage: 10
 })
 
-// ==================================================
-// COLUNAS DA TABELA
-// ==================================================
 
 const columns = [
   {
@@ -196,7 +166,6 @@ const columns = [
     align: 'left',
     sortable: true
   },
-
   {
     name: 'data',
     label: 'Data',
@@ -204,46 +173,36 @@ const columns = [
     align: 'left',
     sortable: true
   },
-
   {
     name: 'inicio',
     label: 'Início',
     field: row => formatarHora(row.inicio),
     align: 'left'
   },
-
   {
     name: 'fim',
     label: 'Fim',
     field: row => formatarHora(row.fim),
     align: 'left'
   },
-
   {
     name: 'duracao',
     label: 'Duração',
-    field: row => formatarDuracao(
-      row.duracaoSegundos
-    ),
+    field: row => formatarDuracao(row.duracaoSegundos),
     align: 'left'
   },
-
   {
     name: 'operador',
     label: 'Operador',
-    field: row =>
-      row.operador?.nome || '-',
+    field: row => row.operador?.nome || '-',
     align: 'left'
   },
-
   {
     name: 'motivo',
     label: 'Motivo',
-    field: row =>
-      row.motivo?.descricao || '',
+    field: row => row.motivo?.descricao || '',
     align: 'left'
   },
-
   {
     name: 'situacao',
     label: 'Situação',
@@ -252,82 +211,50 @@ const columns = [
   }
 ]
 
-// ==================================================
-// INDICADORES
-// ==================================================
 
-const totalJustificadas =
-  computed(() => {
-    return paradas.value.filter(
-      parada => parada.justificada
-    ).length
-  })
+const totalJustificadas = computed(() => {
+  return paradas.value.filter(
+    parada => parada.justificada
+  ).length
+})
 
-const totalNaoJustificadas =
-  computed(() => {
-    return paradas.value.filter(
-      parada => !parada.justificada
-    ).length
-  })
+const totalNaoJustificadas = computed(() => {
+  return paradas.value.filter(
+    parada => !parada.justificada
+  ).length
+})
 
-const tempoTotalSegundos =
-  computed(() => {
-    return paradas.value.reduce(
-      (total, parada) => {
-        return (
-          total +
-          Number(
-            parada.duracaoSegundos || 0
-          )
-        )
-      },
-      0
-    )
-  })
+const tempoTotalSegundos = computed(() => {
+  return paradas.value.reduce((total, parada) => {
+    return total + Number(parada.duracaoSegundos || 0)
+  }, 0)
+})
 
-const tempoTotalFormatado =
-  computed(() => {
-    return formatarDuracao(
-      tempoTotalSegundos.value
-    )
-  })
-
-// ==================================================
-// BUSCAR PARADAS
-// ==================================================
+const tempoTotalFormatado = computed(() => {
+  return formatarDuracao(tempoTotalSegundos.value)
+})
 
 async function buscarParadas () {
   loading.value = true
 
   try {
-    const response = await fetch(
-      `${API_URL}/paradas`
-    )
+    const { data: result } = await api.get('/paradas')
 
-    const result =
-      await response.json()
-
-    if (
-      !response.ok ||
-      !result.success
-    ) {
+    if (!result?.success) {
       throw new Error(
-        result.message ||
-        'Erro ao consultar paradas.'
+        result?.message || 'Erro ao consultar paradas.'
       )
     }
 
-    paradas.value =
-      result.data || []
+    paradas.value = result.data || []
   } catch (error) {
-    console.error(
-      'Erro ao carregar histórico:',
-      error
-    )
+    console.error('Erro ao carregar histórico:', error)
+
+    paradas.value = []
 
     $q.notify({
       type: 'negative',
-      message:
+      message: error.response?.data?.message ||
         'Não foi possível carregar o histórico de paradas.'
     })
   } finally {
@@ -335,103 +262,54 @@ async function buscarParadas () {
   }
 }
 
-// ==================================================
-// FORMATAR DATA
-// ==================================================
-
 function formatarData (valor) {
-  if (!valor) {
-    return '-'
-  }
+  if (!valor) return '-'
 
   const data = new Date(valor)
 
-  return new Intl.DateTimeFormat(
-    'pt-BR',
-    {
-      timeZone:
-        'America/Sao_Paulo',
-
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }
-  ).format(data)
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(data)
 }
-
-// ==================================================
-// FORMATAR HORÁRIO
-// ==================================================
 
 function formatarHora (valor) {
-  if (!valor) {
-    return '-'
-  }
+  if (!valor) return '-'
 
   const data = new Date(valor)
 
-  return new Intl.DateTimeFormat(
-    'pt-BR',
-    {
-      timeZone:
-        'America/Sao_Paulo',
-
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-
-      hour12: false
-    }
-  ).format(data)
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(data)
 }
 
-// ==================================================
-// FORMATAR DURAÇÃO
-// ==================================================
-
 function formatarDuracao (segundos) {
-  if (
-    segundos === null ||
-    segundos === undefined
-  ) {
+  if (segundos === null || segundos === undefined) {
     return '-'
   }
 
-  const total =
-    Number(segundos)
+  const total = Number(segundos)
 
-  const horas =
-    Math.floor(total / 3600)
-
-  const minutos =
-    Math.floor(
-      (total % 3600) / 60
-    )
-
-  const segundosRestantes =
-    total % 60
+  const horas = Math.floor(total / 3600)
+  const minutos = Math.floor((total % 3600) / 60)
+  const segundosRestantes = total % 60
 
   if (horas > 0) {
-    return (
-      `${horas}h ` +
-      `${minutos}min ` +
-      `${segundosRestantes}s`
-    )
+    return `${horas}h ${minutos}min ${segundosRestantes}s`
   }
 
   if (minutos > 0) {
-    return (
-      `${minutos}min ` +
-      `${segundosRestantes}s`
-    )
+    return `${minutos}min ${segundosRestantes}s`
   }
 
   return `${segundosRestantes}s`
 }
-
-// ==================================================
-// INICIALIZAÇÃO
-// ==================================================
 
 onMounted(() => {
   buscarParadas()
