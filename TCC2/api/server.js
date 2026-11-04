@@ -14,22 +14,47 @@ dotenv.config()
 
 const app = express()
 
-const PORT = process.env.API_PORT || 3000
+const PORT = Number(
+  process.env.PORT || process.env.API_PORT || 3000
+)
 
-// ============================================
-// CONFIGURAÇÃO DO CORS
-// ============================================
+const HOST = process.env.API_HOST || '0.0.0.0'
 
-// Permite a comunicação do frontend Quasar
-// com a API durante o desenvolvimento.
+const localOrigins = [
+  'http://localhost:9000',
+  'http://127.0.0.1:9000',
+  'http://localhost:9001',
+  'http://127.0.0.1:9001',
+  'http://localhost:9300',
+  'http://127.0.0.1:9300'
+]
+
+const extraOrigins = (
+  process.env.CORS_ORIGINS || ''
+)
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean)
+
+const allowedOrigins = [
+  ...localOrigins,
+  ...extraOrigins
+]
+
 app.use(cors({
-  origin: [
-    'http://localhost:9001',
-    'http://localhost:9000',
-    'http://127.0.0.1:9000',
-    'http://localhost:9300',
-    'http://127.0.0.1:9300'
-  ],
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true)
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true)
+    }
+
+    return callback(
+      new Error('Origem não permitida pelo CORS')
+    )
+  },
   methods: [
     'GET',
     'POST',
@@ -44,26 +69,15 @@ app.use(cors({
   ]
 }))
 
-// Permite receber dados JSON
 app.use(express.json())
 
-// ============================================
-// ROTAS DA API
-// ============================================
-
-// Autenticação
 app.use('/api/auth', authRoutes)
 
-// Funcionalidades existentes
 app.use('/api/motivos', motivosRoutes)
+
 app.use('/api/paradas', paradasRoutes)
 
-// Gerenciamento exclusivo do gestor
 app.use('/api/operadores', operadoresRoutes)
-
-// ============================================
-// VERIFICAÇÃO DA API E DO BANCO
-// ============================================
 
 app.get('/api/health', async (req, res) => {
   try {
@@ -77,7 +91,10 @@ app.get('/api/health', async (req, res) => {
       databaseTime: result.rows[0].agora
     })
   } catch (error) {
-    console.error('Erro ao conectar ao banco:', error)
+    console.error(
+      'Erro ao conectar ao banco:',
+      error
+    )
 
     return res.status(500).json({
       success: false,
@@ -86,16 +103,36 @@ app.get('/api/health', async (req, res) => {
   }
 })
 
-// ============================================
-// INICIALIZAÇÃO DO SERVIDOR
-// ============================================
+app.use((err, req, res, next) => {
+  if (err.message === 'Origem não permitida pelo CORS') {
+    return res.status(403).json({
+      success: false,
+      message: 'Origem não autorizada.'
+    })
+  }
 
-app.listen(PORT, '127.0.0.1', () => {
+  console.error('Erro na API:', err)
+
+  return res.status(500).json({
+    success: false,
+    message: 'Erro interno do servidor.'
+  })
+})
+
+app.listen(PORT, HOST, () => {
   console.log('')
   console.log('================================')
   console.log('API DO TCC INICIADA')
+  console.log('================================')
+  console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`)
+  console.log(`Host: ${HOST}`)
   console.log(`Porta: ${PORT}`)
-  console.log(`Health: http://localhost:${PORT}/api/health`)
-  console.log(`Operadores: http://localhost:${PORT}/api/operadores`)
+  console.log('')
+  console.log('Rotas disponíveis:')
+  console.log('/api/health')
+  console.log('/api/auth')
+  console.log('/api/motivos')
+  console.log('/api/paradas')
+  console.log('/api/operadores')
   console.log('================================')
 })
