@@ -24,6 +24,7 @@ const PORT = process.env.API_PORT || 3000
 // com a API durante o desenvolvimento.
 app.use(cors({
   origin: [
+    'http://localhost:9001',
     'http://localhost:9000',
     'http://127.0.0.1:9000',
     'http://localhost:9300',
