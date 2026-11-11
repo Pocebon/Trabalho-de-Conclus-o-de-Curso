@@ -153,13 +153,11 @@ export async function finalizarParada(req, res) {
     })
 
     console.log('')
-    console.log('================================')
     console.log('PARADA FINALIZADA PELA API')
     console.log('ID:', parada.id)
     console.log('Início:', parada.inicio)
     console.log('Fim:', parada.fim)
     console.log('Duração:', parada.duracao_segundos, 'segundos')
-    console.log('================================')
 
     return res.status(200).json({
       success: true,

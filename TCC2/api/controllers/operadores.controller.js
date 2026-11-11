@@ -65,8 +65,6 @@ export async function cadastrarOperador(req, res) {
 
     const senha = req.body?.senha
 
-    // VALIDAR NOME
-
     if (!nome || nome.length > 100) {
       return res.status(400).json({
         success: false,

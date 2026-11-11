@@ -141,10 +141,6 @@ const saving = ref(false)
 
 let removeStopListener = null
 
-// ==================================================
-// MOTIVO SELECIONADO
-// ==================================================
-
 const selectedReasonObject =
   computed(() => {
     return reasons.value.find(
@@ -153,10 +149,6 @@ const selectedReasonObject =
         selectedReason.value
     )
   })
-
-// ==================================================
-// VERIFICAR SE O MOTIVO É "OUTRO"
-// ==================================================
 
 const isOtherReason =
   computed(() => {
@@ -168,10 +160,6 @@ const isOtherReason =
       'outro'
     )
   })
-
-// ==================================================
-// FORMATAR DATA/HORA DA PARADA
-// ==================================================
 
 const formattedStartedAt =
   computed(() => {
@@ -203,10 +191,6 @@ const formattedStartedAt =
       time
     )
   })
-
-// ==================================================
-// CARREGAR MOTIVOS
-// ==================================================
 
 async function loadReasons () {
   loadingReasons.value = true
@@ -259,10 +243,6 @@ async function loadReasons () {
     loadingReasons.value = false
   }
 }
-
-// ==================================================
-// REGISTRAR JUSTIFICATIVA
-// ==================================================
 
 async function registerReason () {
 
@@ -358,10 +338,6 @@ async function registerReason () {
   }
 }
 
-// ==================================================
-// ESCUTAR PARADA CONFIRMADA PELO ELECTRON
-// ==================================================
-
 onMounted(() => {
 
   if (
@@ -397,8 +373,6 @@ onMounted(() => {
             observation.value =
               ''
 
-            // Busca os motivos SOMENTE
-            // quando existe uma parada.
             await loadReasons()
 
             dialogOpen.value = true
@@ -406,10 +380,6 @@ onMounted(() => {
         )
   }
 })
-
-// ==================================================
-// REMOVER LISTENER
-// ==================================================
 
 onBeforeUnmount(() => {
   if (removeStopListener) {

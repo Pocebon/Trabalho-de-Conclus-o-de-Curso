@@ -1,7 +1,6 @@
 
 <template>
   <q-layout view="lHh Lpr lFf">
-    <!-- CABEÇALHO -->
     <q-header elevated>
       <q-toolbar>
         <q-btn
@@ -31,7 +30,6 @@
       </q-toolbar>
     </q-header>
 
-    <!-- MENU LATERAL -->
     <q-drawer
       v-if="usuario"
       v-model="leftDrawerOpen"
@@ -40,7 +38,6 @@
       :width="270"
     >
       <div class="column full-height">
-        <!-- USUÁRIO LOGADO -->
         <div class="q-pa-lg">
           <div class="row items-center no-wrap">
             <q-avatar
@@ -73,7 +70,6 @@
             Menu
           </q-item-label>
 
-          <!-- MENU DO GESTOR -->
           <template v-if="usuario.perfil === 'gestor'">
             <q-item
               clickable
@@ -136,7 +132,6 @@
               </q-item-section>
             </q-item>
 
-            <!-- NOVO: GERENCIAMENTO DE OPERADORES -->
             <q-item
               clickable
               v-ripple

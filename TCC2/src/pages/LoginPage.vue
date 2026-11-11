@@ -93,7 +93,6 @@ const senha = ref('')
 const mostrarSenha = ref(false)
 const carregando = ref(false)
 
-// Autenticação pela API centralizada no axios.js
 async function autenticarNaAPI(credenciais) {
   try {
     const { data } = await api.post('/auth/login', credenciais)
@@ -142,7 +141,6 @@ async function onLogin() {
 
     let response
 
-    // Mantém a integração com o aplicativo Electron.
     if (window.electronAPI?.loginUser) {
       response = await window.electronAPI.loginUser(credenciais)
     } else {
@@ -155,7 +153,6 @@ async function onLogin() {
       )
     }
 
-    // Mantém a recuperação do JWT utilizada no projeto.
     let token = response.token
 
     if (!token) {

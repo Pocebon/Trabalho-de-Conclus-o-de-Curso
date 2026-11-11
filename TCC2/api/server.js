@@ -121,9 +121,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, HOST, () => {
   console.log('')
-  console.log('================================')
   console.log('API DO TCC INICIADA')
-  console.log('================================')
   console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`)
   console.log(`Host: ${HOST}`)
   console.log(`Porta: ${PORT}`)
@@ -134,5 +132,4 @@ app.listen(PORT, HOST, () => {
   console.log('/api/motivos')
   console.log('/api/paradas')
   console.log('/api/operadores')
-  console.log('================================')
 })

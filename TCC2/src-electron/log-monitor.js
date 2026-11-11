@@ -66,8 +66,6 @@ export function startLogMonitor(
       Number(ss)
     )
 
-    // No arquivo fixo de testes, considera a virada
-    // de meia-noite durante uma parada.
     if (
       fixedFile &&
       stopStartedAt &&
@@ -187,8 +185,6 @@ export function startLogMonitor(
         durationMs / 1000
       )
 
-      // Confirma pelo horário real dos eventos,
-      // mesmo se o temporizador não tiver disparado.
       if (
         !stopConfirmed &&
         durationMs >= stopThresholdMs

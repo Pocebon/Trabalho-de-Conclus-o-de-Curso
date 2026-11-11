@@ -125,7 +125,6 @@
       </q-table>
     </q-card>
 
-    <!-- CADASTRO E EDIÇÃO -->
     <q-dialog v-model="dialogFormulario" persistent>
       <q-card style="width: 500px; max-width: 95vw">
         <q-card-section class="row items-center">

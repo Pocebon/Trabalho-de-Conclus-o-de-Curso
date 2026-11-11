@@ -1,8 +1,6 @@
 <template>
   <q-page class="q-pa-lg">
-
-    <!-- CABEÇALHO -->
-
+    
     <div class="q-mb-lg">
 
       <div class="text-h4 text-weight-bold">
@@ -15,8 +13,6 @@
       </div>
 
     </div>
-
-    <!-- OPERADOR -->
 
     <q-card
       flat
@@ -50,8 +46,6 @@
 
       </q-card-section>
     </q-card>
-
-    <!-- STATUS -->
 
     <div class="row q-col-gutter-md">
 
@@ -138,8 +132,6 @@
       </div>
 
     </div>
-
-    <!-- INFORMAÇÃO -->
 
     <q-card
       flat
